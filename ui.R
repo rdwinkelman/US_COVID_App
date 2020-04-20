@@ -29,7 +29,9 @@ ui <- f7Page(title="U.S. COVID-19 Data Explorer",
                                <br>
                                <a href='https://covidtracking.com/'>2. COVID Tracking Project Website </a>
                                <br>
-                               <a href='https://rpubs.com/rdwinkelman/covid19_us_spread_part_2'>3. Our RPubs Post w/ Code + Analyses </a>")
+                               <a href='https://github.com/rdwinkelman/US_COVID_App'>3. Github Repo for App Code </a>
+                               <br>
+                               <a href='https://rpubs.com/rdwinkelman/covid19_us_spread_part_2'>4. RPubs Post w/ Other COVID Code + Analyses</a>")
                  ),
                f7Tabs(id="tabs",
                       animated=T,
