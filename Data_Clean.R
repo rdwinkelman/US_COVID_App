@@ -3,8 +3,11 @@ library(tidyr)
 library(readr)
 library(dplyr)
 library(stringr)
+library(lubridate)
+library(here)
 library(janitor)
 
+folder <- "Data"
 date <- paste0(str_replace_all(Sys.Date(),"-","_"),"_")
 
 # Create tibble of state full names and state abbreviations - will be helpful later when joining different datasets together
@@ -12,6 +15,31 @@ state_name_df <- tibble(state_abb = state.abb,
                         state_fullname = state.name) %>%
   bind_rows(tibble(state_abb = c("D.C.","Grand Princess","Diamond Princess"),
                    state_fullname = c("District of Columbia","Grand Princess","Diamond Princess")))
+
+#Part 0: Read in state census data
+# Since it may be of interest to take into account the relative size of each state
+# We will also use tidycensus package to pull population numbers for each state
+# and join it to the testing datasets.  I will pull the population 
+# numbers once and then save the file off locally.
+
+#get population data
+# census_api_key("key",install=T,overwrite = T)
+# 
+# states_pop_df_raw  <- tidycensus::get_estimates(geography = "state",product="population")
+# states_pop_df_raw %>%  write_rds("2020_03_18_tidycensus_states_pop_df_raw.rds")
+
+states_pop_df_raw <- read_rds(here("Data","2020_03_18_tidycensus_states_pop_df_raw.rds"))
+
+states_pop_df <- states_pop_df_raw %>%
+  pivot_wider(names_from = "variable",
+              values_from = "value") %>%
+  clean_names() %>%
+  select(-geoid) %>%
+  rename(state_fullname = name) %>%
+  left_join(state_name_df %>%
+              mutate(state_abb = str_remove_all(state_abb,"\\.")),
+            by="state_fullname")
+
 
 
 #Part 1: Prep JHU State-Level Data 
@@ -46,13 +74,13 @@ state_name_df <- tibble(state_abb = state.abb,
 # jhu_confirmed_cases_wide %>%
 #   write_rds("2020_03_24_JHU_wide_data.rds")
 
-jhu_confirmed_cases_wide <- read_rds("2020_03_24_JHU_wide_data.rds")
+jhu_confirmed_cases_wide <- read_rds(here("Data","2020_03_24_JHU_wide_data.rds"))
 
 
 
 ## Step 1 - From 1/22 through 3/9 - Data Summarized at County Level
 
-jhu_confirmed_cases_wide <- read_rds("2020_03_24_JHU_Long_Data.rds")
+jhu_confirmed_cases_wide <- read_rds(here("Data","2020_03_24_JHU_Long_Data.rds"))
 jhu_confirmed_cases_county_level <- jhu_confirmed_cases_wide %>%
   filter(str_detect(province_state,",|Princess")&str_detect(province_state,"County|Princess|D.C.")) %>% # need to add filter statement to select only county-level and cruise ship data
   pivot_longer(matches("x"),
@@ -72,7 +100,7 @@ jhu_confirmed_cases_county_level <- jhu_confirmed_cases_wide %>%
 filtered_out_province_state <- c("Wuhan Evacuee", "American Samoa", "Diamond Princess", "Grand Princess","Guam", "Northern Mariana Islands", "Puerto Rico", "Virgin Islands",
                                  "Hawaii","Alaska","United States Virgin Islands","Recovered")
 
-  jhu_confirmed_cases_state_level <- jhu_confirmed_cases_wide %>%
+jhu_confirmed_cases_state_level <- jhu_confirmed_cases_wide %>%
   filter(!str_detect(province_state,",")) %>% # need to add filter statement to select only state-level and cruise ship data - avaiable on and after 3/10/2020
   filter(! province_state %in% filtered_out_province_state) %>%
   pivot_longer(matches("x"),
@@ -92,7 +120,7 @@ filtered_out_province_state <- c("Wuhan Evacuee", "American Samoa", "Diamond Pri
 ## Step 3 - Data summarized at county-level (3/23 onward) - Broken up into Daily Files 
 base_url <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/"
 
-date_range <- format(seq(Sys.Date(),as.Date("2020-03-23"),-1),format="%m-%d-%Y")
+date_range <- format(seq(Sys.Date()-1,as.Date("2020-03-23"),-1),format="%m-%d-%Y")
 
 
 jhu_daily_files_compiled_df <- NULL
@@ -101,7 +129,9 @@ for(date_i in date_range){
     clean_names() %>%
     filter(country_region == "US") %>%
     filter(! province_state %in% filtered_out_province_state) %>%
-    mutate(date_fmt = as.Date(last_update)) %>%
+    #mutate(date_fmt = as.Date(last_update)) %>%
+    mutate(date_unfmt = str_extract(last_update,"[0-9-/]{1,}"),
+           date_fmt = as.Date(parse_date_time(date_unfmt,orders=c("%m/%d/%y","%Y-%m-%d")))) %>%
     mutate(date_str=format(date_fmt,format="%m/%d/%y")) %>%
     group_by(province_state,country_region,date_str,date_fmt) %>%
     summarise(case_count = sum(confirmed)) %>%
@@ -136,6 +166,7 @@ jhu_state_confirmed_cases <- jhu_confirmed_cases_county_level %>%
             by="state_abb")
 
 
+
 # JHU Death Data
 # OK now we will repeat the same steps above for the death counts data. 
 
@@ -147,7 +178,7 @@ jhu_state_confirmed_cases <- jhu_confirmed_cases_county_level %>%
 #  
 # jhu_confirmed_deaths_wide %>% write_rds("2020_03_29_JHU_Wide_Death_data_archived.rds")
 
-jhu_confirmed_deaths_wide <- read_rds("2020_03_29_JHU_Wide_Death_data_archived.rds")
+jhu_confirmed_deaths_wide <- read_rds(here("Data","2020_03_29_JHU_Wide_Death_data_archived.rds"))
 
 ## Step 1 - From 1/22 through 3/9 - Data Summarized at County Level
 jhu_confirmed_deaths_county_level <- jhu_confirmed_deaths_wide %>%
@@ -191,7 +222,7 @@ jhu_confirmed_deaths_state_level <- jhu_confirmed_deaths_wide %>%
 ## Step 3 - Data summarized at county-level (3/23 onward) - Broken up into Daily Files 
 base_url <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/"
 
-date_range <- format(seq(Sys.Date(),as.Date("2020-03-23"),-1),format="%m-%d-%Y")
+date_range <- format(seq(Sys.Date()-1,as.Date("2020-03-23"),-1),format="%m-%d-%Y")
 
 
 jhu_daily_files_deaths_compiled_df <- NULL
@@ -200,7 +231,9 @@ for(date_i in date_range){
     clean_names() %>%
     filter(country_region == "US") %>%
     filter(! province_state %in% filtered_out_province_state) %>%
-    mutate(date_fmt = as.Date(last_update)) %>%
+    #mutate(date_fmt = as.Date(last_update)) %>%
+    mutate(date_unfmt = str_extract(last_update,"[0-9-/]{1,}"),
+           date_fmt = as.Date(parse_date_time(date_unfmt,orders=c("%m/%d/%y","%Y-%m-%d")))) %>%
     mutate(date_str=format(date_fmt,format="%m/%d/%y")) %>%
     group_by(province_state,country_region,date_str,date_fmt) %>%
     summarise(death_count = sum(deaths)) %>%
@@ -232,6 +265,7 @@ jhu_state_confirmed_deaths <- jhu_confirmed_deaths_county_level %>%
               mutate(color_pal = scales::hue_pal()(nrow(.))),
             by="state_abb")
 
+
 # Combine JHU cases + death dataset together
 jhu_state_combined <- jhu_state_confirmed_cases %>%
   left_join(jhu_state_confirmed_deaths %>%
@@ -242,9 +276,12 @@ jhu_state_combined <- jhu_state_confirmed_cases %>%
             by=c("state_fullname",
                  "province_state",
                  "date_fmt")) %>%
-  arrange(state_fullname,province_state,date_fmt)
+  arrange(state_fullname,province_state,date_fmt) %>%
+  left_join(states_pop_df %>%
+              select(-state_abb),
+            by="state_fullname")
 # Write off data locally
-jhu_state_combined %>% write_rds(paste0(date,"jhu_state_combined.rds"))
+jhu_state_combined %>% write_rds(here("Data",paste0(date,"jhu_state_combined.rds")))
 
 
 #Part 2: Prep JHU Overall U.S. Data 
@@ -263,9 +300,6 @@ jhu_global_confirmed_cases <- read_csv("https://raw.githubusercontent.com/CSSEGI
   mutate(date_str=str_replace_all(date_str,"_","/")) %>%
   mutate(date_fmt = as.Date(date_str,format="%m/%d/%y")) %>%
   select(-dates)
-
-jhu_global_confirmed_cases %>% write_rds(paste0(date,"jhu_global_confirmed_case.rds"))
-jhu_global_confirmed_cases <- read_rds(paste0(date,"jhu_global_confirmed_case.rds"))
 
 # Step 2: JHU global death data for U.S.
 jhu_global_deaths <- read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv") %>%
@@ -296,10 +330,14 @@ jhu_global_combined <- jhu_global_confirmed_cases %>%
 
 # Step 4: Write off data locally
 
-jhu_global_combined  %>% write_rds(paste0(date,"jhu_global_combined.rds"))
+jhu_global_combined  %>% write_rds(here("Data",paste0(date,"jhu_global_combined.rds")))
+
+
 
 
 #Part 3: COVID Testing Data from COVID Tracking Project
+
+
 
 # Step 1: Read in State Data
 covid_tracking_states <- read_csv("https://covidtracking.com/api/states/daily.csv") %>%
@@ -311,47 +349,30 @@ covid_tracking_states <- read_csv("https://covidtracking.com/api/states/daily.cs
               select(state_abb,grade),
             by="state_abb")
 
-# Step 2: Get Census data for each state
 
-# Since it may be of interest to take into account the relative size of each state
-# We will also use tidycensus package to pull population numbers for each state
-# and join it to the COVID Tracking Project data.  I will pull the population 
-# numbers once and then save the file off locally.
-
-#get population data
-# census_api_key("key",install=T,overwrite = T)
-# 
-# states_pop_df_raw  <- tidycensus::get_estimates(geography = "state",product="population")
-# states_pop_df_raw %>%  write_rds("2020_03_18_tidycensus_states_pop_df_raw.rds")
-
-states_pop_df_raw <- read_rds("2020_03_18_tidycensus_states_pop_df_raw.rds")
-
-states_pop_df <- states_pop_df_raw %>%
-  pivot_wider(names_from = "variable",
-              values_from = "value") %>%
-  clean_names() %>%
-  select(-geoid) %>%
-  rename(state_fullname = name) %>%
-  left_join(state_name_df %>%
-              mutate(state_abb = str_remove_all(state_abb,"\\.")),
-            by="state_fullname")
-
-# Step 3: Join Census data to COVID tracking project data
+# Step 2: Join Census data to COVID tracking project data
 covid_tracking_states_w_pop <- covid_tracking_states %>%
   left_join(states_pop_df,
             by="state_abb") %>%
-  left_join(jhu_state_confirmed_cases %>%
-              distinct(state_abb) %>%
-              mutate(color_pal = scales::hue_pal()(nrow(.))),
+  left_join(jhu_state_combined %>%
+              distinct(state_abb,color_pal),
             by="state_abb") %>%
   mutate(date_fmt = as.Date(date_checked),
          total_per_pop = (total/pop*1e6),
          pct_positive=round_half_up(positive/total*100)) %>%
   select(-c(date,date_checked)) %>%
-  select(date_fmt,everything())
+  select(date_fmt,everything()) %>%
+  mutate(test_total = total,
+         test_total_per_100k = round_half_up(test_total/pop*1e5,digits=1)) %>%
+  arrange(state_fullname,date_fmt) %>%
+  group_by(state_fullname,state_abb) %>%
+  mutate(test_total_daily = test_total - lag(test_total),
+         test_total_daily = ifelse(is.na(test_total_daily),0,test_total_daily),
+         test_total_daily_per_100k =  round_half_up(test_total_daily/pop*1e5,digits=1)) %>%
+  ungroup()
 
 # Step 4: Write off data locally
 
 covid_tracking_states_w_pop %>%
-  write_rds(paste0(date,"CTP_Data.rds"))
+  write_rds(here("Data",paste0(date,"CTP_Data.rds")))
 

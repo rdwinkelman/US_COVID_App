@@ -13,7 +13,7 @@ ui <- f7Page(title="U.S. COVID-19 Data Explorer",
                  f7Panel(
                    title="About",
                    theme="light",
-                   strong(paste0("Last Update: ",format(Sys.Date()-1,format="%m/%d/%y"))),
+                   strong(paste0("Last Update: ",format(update_date,format="%m/%d/%y"))),
                    strong("Authors: "),
                    HTML("<a href='https://twitter.com/rdwinkelman'>Bob Winkelman, MS</a><br> Colin Waltz <br>"),
                    strong("Purpose: "),
@@ -45,30 +45,34 @@ ui <- f7Page(title="U.S. COVID-19 Data Explorer",
                             ),
                             f7Row(
                               f7Col(switchInput("cum_v_daily_1",
-                                                "",
+                                                "Cumulative<br>vs. Daily",
                                                 value=T,
                                                 offLabel="Daily",
                                                 onLabel="Cumulative",
+                                                labelWidth = "100px",
+                                                handleWidth = "75px",
                                                 size="mini",
                                                 inline=T),
                                     switchInput("cases_v_deaths_1",
-                                                "",
+                                                "Cases vs.<br>Deaths",
                                                 value=T,
                                                 offLabel="Deaths",
                                                 onLabel="Cases",
+                                                labelWidth = "100px",
+                                                handleWidth = "75px",
                                                 size="mini",
                                                 inline=T))
                             ),
                             f7Row(
                               f7Col(sliderInput("end_date",
-                                                         "Select Date:",
-                                                         min = min(jhu_state_confirmed_cases$date_fmt),
-                                                         max = max(jhu_state_confirmed_cases$date_fmt),
-                                                         value = max(jhu_state_confirmed_cases$date_fmt),
-                                                         timeFormat ="%m/%d/%y",
+                                                "Select Date:",
+                                                min = min(jhu_state_confirmed_cases$date_fmt),
+                                                max = max(jhu_state_confirmed_cases$date_fmt),
+                                                value = max(jhu_state_confirmed_cases$date_fmt),
+                                                timeFormat ="%m/%d/%y",
                                                 width="95%")
-
-                                       )
+                                    
+                              )
                             ),
                             f7Row(
                               plotlyOutput("overallMapPlot")
@@ -77,93 +81,134 @@ ui <- f7Page(title="U.S. COVID-19 Data Explorer",
                               plotOutput("overallLinePlot")
                             )
                       ),
-                f7Tab(tabName = "State-Level",
-                          active=F,
-                          swipeable=T,
-                      hidden=F,
-                          fluidRow(
-                            f7Col(""),
-                            f7Col(
-                              h3("JHU Data: State-Level", class = "center")),
-                            f7Col("")
-                          ),
-                      f7Row(
-                        f7Col(switchInput("cum_v_daily_2",
-                                          "",
-                                          value=T,
-                                          offLabel="Daily",
-                                          onLabel="Cumulative",
-                                          inline=T,
-                                          size="mini"),
-                        switchInput("cases_v_deaths_2",
-                                    "",
-                                    value=T,
-                                    offLabel="Deaths",
-                                    onLabel="Cases",
-                                    size="mini",
-                                    inline=T))
-                      ),
-                          f7Row(
-                            f7Col(sliderInput("end_date_2",
-                                              "Select Date:",
-                                              min = as.Date("2020-02-24"),
-                                              max = max(jhu_state_confirmed_cases$date_fmt),
-                                              value = max(jhu_state_confirmed_cases$date_fmt),
-                                              timeFormat ="%m/%d/%y",
-                                              width="95%")
-                                  
+                      f7Tab(tabName = "State-Level",
+                            active=F,
+                            swipeable=T,
+                            hidden=F,
+                            fluidRow(
+                              f7Col(""),
+                              f7Col(
+                                h3("JHU Data: State-Level", class = "center")),
+                              f7Col("")
+                            ),
+                            f7Row(
+                              f7Col(selectInput("states_selected_2",
+                                                "",
+                                                choices=c("All States",unique(jhu_state_confirmed_cases$state_fullname)),
+                                                selected="All States",
+                                                multiple=T,
+                                                width="390px"))
+                            ),
+                            f7Row(
+                              f7Col(switchInput("cum_v_daily_2",
+                                                "Cumulative<br>vs. Daily",
+                                                value=T,
+                                                offLabel="Daily",
+                                                onLabel="Cumulative",
+                                                labelWidth = "70px",
+                                                handleWidth = "60px",
+                                                size="mini",
+                                                inline=T),
+                                    switchInput("raw_v_adjusted_2",
+                                                "Pop.<br>Adjusted?",
+                                                value=T,
+                                                offLabel="Yes",
+                                                onLabel="No",
+                                                labelWidth = "60px",
+                                                handleWidth = "30px",
+                                                size="mini",
+                                                inline=T),
+                                    switchInput("cases_v_deaths_2",
+                                                "Cases vs.<br>Deaths",
+                                                value=T,
+                                                offLabel="Deaths",
+                                                onLabel="Cases",
+                                                labelWidth = "60px",
+                                                handleWidth = "35px",
+                                                size="mini",
+                                                inline=T)),
+                            ),
+                            f7Row(
+                              f7Col(sliderInput("end_date_2",
+                                                "Select Date:",
+                                                min = as.Date("2020-02-24"),
+                                                max = max(jhu_state_confirmed_cases$date_fmt),
+                                                value = max(jhu_state_confirmed_cases$date_fmt),
+                                                timeFormat ="%m/%d/%y",
+                                                width="95%")
+                                    
+                              )
+                            ),
+                            f7Row(
+                              plotlyOutput("stateLinePlotly")
+                            ),
+                            f7Row(
+                              plotOutput("stateBarPlot")
                             )
-                          ),
-                      f7Row(
-                        plotlyOutput("stateLinePlotly")
+                            # f7Row(
+                            #   plotlyOutput("stateLinePlotly")
+                            # ),
+                            # f7Row(
+                            #   plotOutput("stateBarPlot")
+                            # )
                       ),
-                      f7Row(
-                        plotOutput("stateBarPlot")
-                      )
-                          # f7Row(
-                          #   plotlyOutput("stateLinePlotly")
-                          # ),
-                          # f7Row(
-                          #   plotOutput("stateBarPlot")
-                          # )
-                    ),
-                f7Tab(tabName="Testing Data",
-                      active=F,
-                      swipeable=T,
-                      f7Row(
-                        f7Col(""),
-                        f7Col(
-                          h3("Testing Data: COVID Tracking Project", class = "center")),
-                        f7Col("")  
-                      ),
-                      f7Row(
-                        f7Col(switchInput("cum_v_daily_3",
-                                          "",
-                                          value=T,
-                                          offLabel="Daily",
-                                          onLabel="Cumulative",
-                                          size="mini"))
-                      ),
-                      f7Row(
-                        f7Col(sliderInput("end_date_3",
-                                          "Select Date:",
-                                          min = min(covid_tracking_states_w_pop$date_fmt),
-                                          max = max(covid_tracking_states_w_pop$date_fmt),
-                                          value = max(covid_tracking_states_w_pop$date_fmt),
-                                          timeFormat ="%m/%d/%y",
-                                          width="95%")
-                        )
-                      ),
-                      f7Row(
-                        plotlyOutput("stateTestingLinePlotly") 
-                      ),
-                      f7Row(
-                        plotlyOutput("stateTestingPositiveVTotalScatter")
-                      ),
-                      f7Row(
-                        plotlyOutput("stateTestingPctPositiveVTotalScatter")
-                      )
+                      f7Tab(tabName="Testing Data",
+                            active=F,
+                            swipeable=T,
+                            f7Row(
+                              f7Col(""),
+                              f7Col(
+                                h3("Testing Data: COVID Tracking Project", class = "center")),
+                              f7Col("")  
+                            ),
+                            f7Row(
+                              f7Col(selectInput("states_selected_3",
+                                                "",
+                                                choices=c("All States",unique(jhu_state_confirmed_cases$state_fullname)),
+                                                selected="All States",
+                                                multiple=T,
+                                                width="390px"))
+                            ),
+                            f7Row(
+                              f7Col(switchInput("cum_v_daily_3",
+                                                "Cumulative<br>vs. Daily",
+                                                value=T,
+                                                offLabel="Daily",
+                                                onLabel="Cumulative",
+                                                labelWidth = "100px",
+                                                handleWidth = "75px",
+                                                size="mini",
+                                                inline=T),
+                                    switchInput("raw_v_adjusted_3",
+                                                "Pop.<br>Adjusted?",
+                                                value=T,
+                                                offLabel="Yes",
+                                                onLabel="No",
+                                                labelWidth = "100px",
+                                                handleWidth = "75px",
+                                                size="mini",
+                                                inline=T))
+                            ),
+                            f7Row(
+                              f7Col(sliderInput("end_date_3",
+                                                "Select Date:",
+                                                min = min(covid_tracking_states_w_pop$date_fmt),
+                                                max = max(covid_tracking_states_w_pop$date_fmt),
+                                                value = max(covid_tracking_states_w_pop$date_fmt),
+                                                timeFormat ="%m/%d/%y",
+                                                width="95%")
+                              )
+                            ),
+                            f7Row(
+                              plotlyOutput("stateTestingLinePlotly") 
+                            ),
+                            f7Row(
+                              plotlyOutput("stateTestingPositiveVTotalScatter")
+                            ),
+                            f7Row(
+                              plotlyOutput("stateTestingPctPositiveVTotalScatter")
+                            )
                       )
                )
-          )
-      )
+             )
+)
